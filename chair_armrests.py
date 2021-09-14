@@ -1,6 +1,7 @@
 from utils import create_axis_aligned_setting
 import random
 
+
 def make_T_armrests(args, box_id):
     out = []
     right_arm = {'name': 'chair_arm', 'children': []}
@@ -52,6 +53,7 @@ def make_T_armrests(args, box_id):
     box_id += 1
 
     return out, [left_arm, right_arm], box_id
+
 
 def make_7_armrests(args, box_id):
     out = []
@@ -105,12 +107,13 @@ def make_7_armrests(args, box_id):
 
     return out, [left_arm, right_arm], box_id
 
+
 def make_armrests(args, box_id):
     args.armWidth = args.legWidth * (args.mode + 1) * 0.7
     args.armDepth = args.seatDepth / 2
     args.armHeight = args.legWidth * (args.mode + 1) * 0.3
     args.armHeightLoc = args.backHeight / 2
-    args.armSupportLoc = (args.armDepth-args.backDepth) / 2
+    args.armSupportLoc = (args.armDepth - args.backDepth) / 2
     args.armSupportDepth = args.legWidth * (args.mode + 1) * 0.4
     args.armSupportWidth = args.legWidth * (args.mode + 1) * 0.4
 
@@ -119,4 +122,3 @@ def make_armrests(args, box_id):
         return make_T_armrests(args, box_id)
     else:
         return make_7_armrests(args, box_id)
-

@@ -1,6 +1,7 @@
 from utils import *
 import random
 
+
 def make_simple_back(args, box_id):
     x_min = (args.seatWidth - args.backWidth) / 2
     x_max = (args.seatWidth - args.backWidth) / 2 + args.backWidth
@@ -9,8 +10,10 @@ def make_simple_back(args, box_id):
     z_min = 0
     z_max = args.backDepth
     out = [create_axis_aligned_setting(x_min, x_max, y_min, y_max, z_min, z_max)]
-    csg = {'name': 'chair_back', 'children': [{'name': 'back_surface', 'children': [{'name': 'back_single_surface', 'objs': [str(box_id)]}]}]}
+    csg = {'name'    : 'chair_back',
+           'children': [{'name': 'back_surface', 'children': [{'name': 'back_single_surface', 'objs': [str(box_id)]}]}]}
     return out, csg, box_id + 1
+
 
 def make_back_frame(args, box_id):
     out = []
@@ -40,7 +43,7 @@ def make_back_frame(args, box_id):
         out.append(create_axis_aligned_setting(x_min, x_max, y_min, y_max, z_min, z_max))
         csg['children'].append({'name': 'back_frame_vertical_bar', 'objs': [str(box_id)]})
         box_id += 1
-        
+
         # left side-bar
         x_min = (args.seatWidth - args.backWidth) / 2 + args.backWidth - args.backSideBarWidth
         x_max = (args.seatWidth - args.backWidth) / 2 + args.backWidth
@@ -53,6 +56,7 @@ def make_back_frame(args, box_id):
         box_id += 1
 
     return out, csg, box_id
+
 
 def make_T_back(args, box_id):
     out, back_frame_csg, box_id = make_back_frame(args, box_id)
@@ -70,14 +74,15 @@ def make_T_back(args, box_id):
     surface_csg = {'name': 'back_surface', 'children': []}
 
     for i in range(args.backNumSurfaceBars):
-        x_min = x_range_min + x_grid_size*(i+1) - args.backSurfaceBarWidth / 2
-        x_max = x_range_min + x_grid_size*(i+1) + args.backSurfaceBarWidth / 2
+        x_min = x_range_min + x_grid_size * (i + 1) - args.backSurfaceBarWidth / 2
+        x_max = x_range_min + x_grid_size * (i + 1) + args.backSurfaceBarWidth / 2
         out.append(create_axis_aligned_setting(x_min, x_max, y_min, y_max, z_min, z_max))
-        surface_csg['children'].append({'name': 'back_surface_vertical_bar', 'objs': [str(box_id+i)]})
+        surface_csg['children'].append({'name': 'back_surface_vertical_bar', 'objs': [str(box_id + i)]})
 
     csg = {'name': 'chair_back', 'children': [surface_csg, back_frame_csg]}
-    
+
     return out, csg, box_id + args.backNumSurfaceBars
+
 
 def make_H_back(args, box_id):
     out, back_frame_csg, box_id = make_back_frame(args, box_id)
@@ -95,14 +100,15 @@ def make_H_back(args, box_id):
     surface_csg = {'name': 'back_surface', 'children': []}
 
     for i in range(args.backNumSurfaceBars):
-        y_min = y_range_min + y_grid_size*(i+1) - args.backSurfaceBarWidth / 2
-        y_max = y_range_min + y_grid_size*(i+1) + args.backSurfaceBarWidth / 2
+        y_min = y_range_min + y_grid_size * (i + 1) - args.backSurfaceBarWidth / 2
+        y_max = y_range_min + y_grid_size * (i + 1) + args.backSurfaceBarWidth / 2
         out.append(create_axis_aligned_setting(x_min, x_max, y_min, y_max, z_min, z_max))
-        surface_csg['children'].append({'name': 'back_surface_horizontal_bar', 'objs': [str(box_id+i)]})
+        surface_csg['children'].append({'name': 'back_surface_horizontal_bar', 'objs': [str(box_id + i)]})
 
     csg = {'name': 'chair_back', 'children': [surface_csg, back_frame_csg]}
-    
+
     return out, csg, box_id + args.backNumSurfaceBars
+
 
 def make_back(args, box_id):
     args.backDepth *= (args.mode * 1.2 + 1)
@@ -113,4 +119,3 @@ def make_back(args, box_id):
         return make_H_back(args, box_id)
     else:
         return make_T_back(args, box_id)
-
