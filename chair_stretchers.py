@@ -2,14 +2,15 @@ from utils import *
 import random
 import math
 
+
 def make_X_stretchers(args, box_id):
     out = []
     parts = []
 
     left_leg_x = args.seatWidth - args.legWidth / 2
     right_leg_x = args.legWidth / 2
-    front_leg_z = args.seatDepth - args.legWidth /2
-    back_leg_z = args.legWidth /2
+    front_leg_z = args.seatDepth - args.legWidth / 2
+    back_leg_z = args.legWidth / 2
 
     center_x = (left_leg_x + right_leg_x) / 2
     center_z = (front_leg_z + back_leg_z) / 2
@@ -36,6 +37,7 @@ def make_X_stretchers(args, box_id):
     box_id += 1
 
     return out, parts, box_id
+
 
 def make_H_stretchers(args, box_id):
     out = []
@@ -71,12 +73,14 @@ def make_H_stretchers(args, box_id):
     setting = np.array([[(left_leg_x + right_leg_x) / 2, y, (front_leg_z + back_leg_z) / 2, 1],
                         [left_leg_x, y, (front_leg_z + back_leg_z) / 2, 1],
                         [(left_leg_x + right_leg_x) / 2, y + delta_y, (front_leg_z + back_leg_z) / 2, 1],
-                        [(left_leg_x + right_leg_x) / 2, y, (front_leg_z + back_leg_z) / 2 + delta_y, 1]], dtype=np.float32)
+                        [(left_leg_x + right_leg_x) / 2, y, (front_leg_z + back_leg_z) / 2 + delta_y, 1]],
+                       dtype=np.float32)
     out.append(setting)
     parts.append({'name': 'bar_stretcher', 'objs': [str(box_id)]})
     box_id += 1
 
     return out, parts, box_id
+
 
 def make_O_stretchers(args, box_id):
     out = []
@@ -84,8 +88,8 @@ def make_O_stretchers(args, box_id):
 
     left_leg_x = args.seatWidth - args.legWidth / 2
     right_leg_x = args.legWidth / 2
-    front_leg_z = args.seatDepth - args.legWidth /2
-    back_leg_z = args.legWidth /2
+    front_leg_z = args.seatDepth - args.legWidth / 2
+    back_leg_z = args.legWidth / 2
 
     # one bar
     y = args.stretcherHeight + args.stretcherWidth / 2
@@ -128,6 +132,7 @@ def make_O_stretchers(args, box_id):
 
     return out, parts, box_id
 
+
 def make_stretchers(args, box_id):
     args.stretcherWidth = args.legWidth * (args.mode + 1) * 0.6
     args.stretcherHeight = 0.03
@@ -139,4 +144,3 @@ def make_stretchers(args, box_id):
         return make_X_stretchers(args, box_id)
     else:
         return make_H_stretchers(args, box_id)
-

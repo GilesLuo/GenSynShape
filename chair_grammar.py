@@ -12,8 +12,8 @@ from chair_stretchers import make_stretchers
 
 
 def make_sofa(args, idx):
-    csg = [{'name': 'chair', 'parts': []}];
-    chair = [];
+    csg = [{'name': 'chair', 'parts': []}]
+    chair = []
     box_id = 0
 
     back_parts, child_csg, box_id = make_back(args, box_id)
@@ -41,8 +41,8 @@ def make_sofa(args, idx):
 
 
 def make_stool(args, idx):
-    csg = {'name': 'chair', 'children': []};
-    chair = [];
+    csg = {'name': 'chair', 'children': []}
+    chair = []
     box_id = 0
 
     seat_parts, child_csg, box_id = make_seat(args, box_id)
@@ -71,8 +71,8 @@ def make_stool(args, idx):
 
 
 def make_chair(args, idx):
-    csg = {'name': 'chair', 'children': []};
-    chair = [];
+    csg = {'name': 'chair', 'children': []}
+    chair = []
     box_id = 0
 
     back_parts, child_csg, box_id = make_back(args, box_id)

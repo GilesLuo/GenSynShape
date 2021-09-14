@@ -12,9 +12,9 @@ from chair_legs import *
 from chair_armrests import *
 from chair_stretchers import *
 
+
 # out_dir = sys.argv[1]
 # num_to_gen = int(sys.argv[2])
-out_dir = 'gensyn/chair/'
 
 
 def get_random(x, y):
@@ -124,18 +124,24 @@ def generate_chair_new(legWidth, legHeight, seatWidth, seatDepth,
 
     back_args_set = []
     back_args_set.append(dict({'back_type': 'simple'}))
-    back_args_set.append(dict({'hasBackTopBar'     : True, 'hasBackSideBar': True, 'back_type': 'H',
-                               'backTopBarHeight'  : args['backHeight'] / 5,
-                               'backSideBarWidth'  : args['backWidth'] / 10,
-                               'backNumSurfaceBars': backNumSurfaceBars[0], 'backSurfaceBarWidth': backSurfaceBarDepth[0], 'backSurfaceBarDepth': backSurfaceBarDepth[1]}))
-    back_args_set.append(dict({'hasBackTopBar'     : False, 'hasBackSideBar': True, 'back_type': 'H',
-                               'backTopBarHeight'  : args['backHeight'] / 5,
-                               'backSideBarWidth'  : args['backWidth'] / 10,
-                               'backNumSurfaceBars': backNumSurfaceBars[1], 'backSurfaceBarWidth': backSurfaceBarDepth[2], 'backSurfaceBarDepth': backSurfaceBarDepth[3]}))
-    back_args_set.append(dict({'hasBackTopBar'     : True, 'hasBackSideBar': False, 'back_type': 'T',
-                               'backTopBarHeight'  : args['backHeight'] / 10,
-                               'backSideBarWidth'  : args['backWidth'] / 10,
-                               'backNumSurfaceBars': backNumSurfaceBars[2], 'backSurfaceBarWidth': backSurfaceBarDepth[4], 'backSurfaceBarDepth': backSurfaceBarDepth[5]}))
+    back_args_set.append(dict({'hasBackTopBar'      : True, 'hasBackSideBar': True, 'back_type': 'H',
+                               'backTopBarHeight'   : args['backHeight'] / 5,
+                               'backSideBarWidth'   : args['backWidth'] / 10,
+                               'backNumSurfaceBars' : backNumSurfaceBars[0],
+                               'backSurfaceBarWidth': backSurfaceBarDepth[0],
+                               'backSurfaceBarDepth': backSurfaceBarDepth[1]}))
+    back_args_set.append(dict({'hasBackTopBar'      : False, 'hasBackSideBar': True, 'back_type': 'H',
+                               'backTopBarHeight'   : args['backHeight'] / 5,
+                               'backSideBarWidth'   : args['backWidth'] / 10,
+                               'backNumSurfaceBars' : backNumSurfaceBars[1],
+                               'backSurfaceBarWidth': backSurfaceBarDepth[2],
+                               'backSurfaceBarDepth': backSurfaceBarDepth[3]}))
+    back_args_set.append(dict({'hasBackTopBar'      : True, 'hasBackSideBar': False, 'back_type': 'T',
+                               'backTopBarHeight'   : args['backHeight'] / 10,
+                               'backSideBarWidth'   : args['backWidth'] / 10,
+                               'backNumSurfaceBars' : backNumSurfaceBars[2],
+                               'backSurfaceBarWidth': backSurfaceBarDepth[4],
+                               'backSurfaceBarDepth': backSurfaceBarDepth[5]}))
 
     # Make 2 variants for chair legs
     leg_args_set = []
@@ -176,7 +182,8 @@ if __name__ == "__main__":
     import numpy as np
     from tqdm import tqdm
 
-    num_to_gen = 105
+    out_dir = 'gensyn/chair/'
+    # num_to_gen = 105
     print('Generating random chairs to folder %s ...' % (out_dir))
     # Fix a set of lobal parameters
     # args['legWidth'] = get_random(0.02, 0.07)
@@ -194,13 +201,17 @@ if __name__ == "__main__":
     backHeight = np.linspace(0.2, 0.5, 3, endpoint=True)
     backDepth = np.linspace(0.02, 0.1, 3, endpoint=True)
     counter = 0
-    for i1 in tqdm(legWidth):
-        for i2 in tqdm(legHeight, leave=False):
-            for i3 in tqdm(seatWidth, leave=False):
-                for i4 in tqdm(seatDepth, leave=False):
-                    for i5 in tqdm(seatHeight, leave=False):
-                        for i6 in tqdm(backHeight, leave=False):
-                            for i7 in tqdm(backDepth, leave=False):
-                                generate_chair(i1, i2, i3, i4,
-                                               i5, i6, i7, counter)
-                                counter += 1
+
+    with tqdm(total=len(legWidth) * len(legHeight) * len(seatWidth) * len(
+        seatDepth) * len(seatHeight) * len(backHeight) * len(backDepth) * 96) as pbar:
+        for i1 in tqdm(legWidth):
+            for i2 in tqdm(legHeight, leave=False):
+                for i3 in tqdm(seatWidth, leave=False):
+                    for i4 in tqdm(seatDepth, leave=False):
+                        for i5 in tqdm(seatHeight, leave=False):
+                            for i6 in tqdm(backHeight, leave=False):
+                                for i7 in tqdm(backDepth, leave=False):
+                                    generate_chair(i1, i2, i3, i4,
+                                                   i5, i6, i7, counter)
+                                    counter += 1
+                                    pbar.update(96)

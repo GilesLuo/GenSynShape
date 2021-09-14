@@ -1,6 +1,7 @@
 from utils import *
 import random
 
+
 def make_seat(args, box_id):
     x_min = 0
     x_max = args.seatWidth

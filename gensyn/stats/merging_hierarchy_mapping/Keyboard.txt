@@ -1,3 +1,0 @@
-keyboard keyboard
-keyboard/frame keyboard/frame
-keyboard/key keyboard/key
