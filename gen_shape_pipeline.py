@@ -1,7 +1,7 @@
 import numpy as np
 from tqdm import tqdm
 from random_gen_chair import generate_chair_new, generate_chair, get_random
-from pyquaternion import Quaternion
+from pyquaternion.quaternion import Quaternion
 import prepare_shape
 import os
 import json
@@ -11,14 +11,18 @@ import json
 import copy
 import ipdb
 import torch
+import multiprocessing as mp
+from pathos.multiprocessing import ProcessPool as Pool
 import math
 import random
 from prepare_contact_points import qrot, get_pair_list, find_pts_ind
 
 
 class GenShapes:
-    def __init__(self, source_dir):
+    def __init__(self, source_dir, num_core=16):
         self.source_dir = source_dir
+        self.num_core = num_core
+        self.parallel_pool = Pool(self.num_core)
 
     def gen_chair_lin(self, obj_save_dir, l1, l2, s1, s2, s3, b1, b2,
                       l1_l=0.02, l1_h=0.07,
@@ -75,7 +79,7 @@ class GenShapes:
             pbar.update(96)
         pbar.close()
 
-    def pipeline(self, gen_info: dir, stat_path: str, method: str):
+    def run_pipeline(self, gen_info: dir, stat_path: str, method: str):
         """
         :param gen_info: is a dir in the format of {'cat_name': args}
                 e.g., {'Chair': (1,1,1,1,1,1,1),
@@ -85,7 +89,7 @@ class GenShapes:
         """
 
         for cat_name, args in gen_info.items():
-            obj_save_dir = self.source_dir + cat_name + '/'
+            obj_save_dir = self.source_dir + cat_name + '_obj/'
             if not os.path.exists(obj_save_dir):
                 os.mkdir(obj_save_dir)
             if os.listdir(obj_save_dir):
@@ -101,7 +105,7 @@ class GenShapes:
 
             if not os.path.exists(root_to_save_shape):
                 os.mkdir(root_to_save_shape)
-            self.prepare_dataset(obj_save_dir, root_to_save_shape, stat_path, cat_name, levels=[3])
+            self.prepare_data(obj_save_dir, root_to_save_shape, stat_path, cat_name, levels=[3])
 
             root_to_save_contact_points = self.source_dir + str(cat_name) + "_contact_points/"
             if not os.path.exists(root_to_save_contact_points):
@@ -151,7 +155,7 @@ class GenShapes:
         with open('{}.test.json'.format(output_dir + object_name), 'w') as result_file:
             json.dump(test, result_file)
 
-    def prepare_dataset(self, obj_dir, root_to_save_file, stat_path,
+    def prepare_data(self, obj_dir, root_to_save_file, stat_path,
                         cat_name, modes=None, levels=None):
         """
         :param root_to_save_file: output dir
@@ -180,100 +184,129 @@ class GenShapes:
                 lev = f.readlines()
                 lev = ['/' + s.split(' ')[1].replace('\n', '') for s in lev]
 
-            # for each mode 
-            num = 0
+            allResults = []
             for mode in modes:
-
-                # get the object list to deal with
-                # object_json =json.load(open(self.source_dir + "/train_val_test_split/" + cat_name +"." + mode + ".json"))
                 object_json = json.load(open(self.source_dir + "/" + cat_name + "." + mode + ".json"))
                 object_list = [object_json[i]['anno_id'] for i in range(len(object_json))]
-                # print(ob)
-                # for each object:
-                pbar = tqdm(total=len(object_list))
                 for i, idx in enumerate(object_list):
-                    if os.path.exists(root_to_save_file + str(idx) + "_level" + str(level) + ".npy"):
+                    result = self.parallel_pool.apipe(self._gen_1_shape,
+                                                      root_to_save_file, idx, lev, level, obj_dir, hier)
+                    allResults.append([result, level, mode, idx])
+
+            jobsCompleted = 0
+            pbar = tqdm(total=len(allResults))
+            while len(allResults) > 0:
+                for i in range(len(allResults)):
+                    task, level, mode, idx = allResults[i]
+                    if task.ready():
+                        jobsCompleted += 1
+                        pbar.desc = "using {} cores, " \
+                                    "converting level{}-mode {}-idx{}".format(self.num_core, level, mode, idx)
                         pbar.update()
-                        continue
-                    pbar.desc = "converting level{}-mode {}-idx{}".format(level, mode, idx)
-                    # get information in obj file
-                    obj_folder_name = obj_dir + str(idx)
-                    parts_pcs, Rs, ts, parts_names, sizes = prepare_shape.get_shape_info(obj_folder_name, lev)
+                        task.get()
+                        allResults.pop(i)
+                        break
 
-                    # get class index and geo class index
-                    parts_ids = [hier[name] for name in parts_names]
-                    geo_part_ids = prepare_shape.get_geo_part_ids(sizes, parts_ids)
+    @staticmethod
+    def _gen_1_shape(root_to_save_file, idx, lev, level, obj_dir, hier):
+        if os.path.exists(root_to_save_file + str(idx) + "_level" + str(level) + ".npy"):
+            return
 
-                    # gen sym_stick info
-                    sym = prepare_shape.get_sym(parts_pcs)
-                    # get part poses from R , T
-                    parts_poses = []
-                    for R, t in zip(Rs, ts):
-                        if np.linalg.det(R) < 0:
-                            R = -R
-                        try:
-                            q = Quaternion(matrix=R)
-                        except:
-                            print('level{}-mode {}-idx{} broken, skipping'.format(level, mode, idx))
-                            continue
-                        q = np.array([q[i] for i in range(4)])
-                        parts_pose = np.concatenate((t, q), axis=0)
-                        parts_poses.append(parts_pose)
-                    parts_poses = np.array(parts_poses)
-                    new_dict = {v: k for k, v in hier.items()}
-                    dic_to_save = {"part_pcs"    : parts_pcs, "part_poses": parts_poses, "part_ids": parts_ids,
-                                   "geo_part_ids": geo_part_ids, "sym": sym}
-                    np.save(root_to_save_file + str(idx) + "_level" + str(level) + ".npy", dic_to_save)
-                    pbar.update()
-                pbar.close()
+        # get information in obj file
+        obj_folder_name = obj_dir + str(idx)
+        parts_pcs, Rs, ts, parts_names, sizes = prepare_shape.get_shape_info(obj_folder_name, lev)
+
+        # get class index and geo class index
+        parts_ids = [hier[name] for name in parts_names]
+        geo_part_ids = prepare_shape.get_geo_part_ids(sizes, parts_ids)
+
+        # gen sym_stick info
+        sym = prepare_shape.get_sym(parts_pcs)
+        # get part poses from R , T
+        parts_poses = []
+        for R, t in zip(Rs, ts):
+            if np.linalg.det(R) < 0:
+                R = -R
+
+            q = Quaternion(matrix=R)
+
+            q = np.array([q[i] for i in range(4)])
+            parts_pose = np.concatenate((t, q), axis=0)
+            parts_poses.append(parts_pose)
+
+        parts_poses = np.array(parts_poses)
+        new_dict = {v: k for k, v in hier.items()}
+        dic_to_save = {"part_pcs"    : parts_pcs, "part_poses": parts_poses, "part_ids": parts_ids,
+                       "geo_part_ids": geo_part_ids, "sym": sym}
+        np.save(root_to_save_file + str(idx) + "_level" + str(level) + ".npy", dic_to_save)
+        return
 
     def prepare_contact_points(self, shape_dir, root_to_save_file, cat_name, modes=None, levels=None):
         if levels is None:
             levels = [3, 1, 2]
         if modes is None:
             modes = ["train", "val", "test"]
+
+        allResults = []
         for level in levels:
             for mode in modes:
                 object_json = json.load(open(self.source_dir + cat_name + "." + mode + ".json"))
                 object_list = [object_json[i]['anno_id'] for i in range(len(object_json))]
-                idx = 0
                 for id in object_list:
-                    idx += 1
-                    print("level", level, " ", mode, " ", id, "      ", idx, "/", len(object_list))
-                    if not os.path.exists(root_to_save_file + 'pairs_with_contact_points_%s_level' % id + str(
-                            level) + '.npy'):
-                        # if os.path.isfile(root + "contact_points/" + 'pairs_with_contact_points_%s_level' % id +
-                        # str(level) + '.npy'):
-                        cur_data_fn = os.path.join(shape_dir, '%s_level' % id + str(level) + '.npy')
-                        cur_data = np.load(cur_data_fn,
-                                           allow_pickle=True).item()
-                        cur_pts = cur_data['part_pcs']  # p x N x 3 (p is unknown number of parts for this shape)
-                        class_index = cur_data['part_ids']
-                        num_parts, num_point, _ = cur_pts.shape
-                        poses = cur_data['part_poses']
-                        quat = poses[:, 3:]
-                        center = poses[:, :3]
-                        print(cur_pts.shape)
-                        print(poses.shape)
-                        gt_pts = copy.copy(cur_pts)
-                        for i in range(num_parts):
-                            gt_pts[i] = qrot(torch.from_numpy(quat[i]).unsqueeze(0).repeat(num_point, 1).unsqueeze(0),
-                                             torch.from_numpy(cur_pts[i]).unsqueeze(0))
-                            gt_pts[i] = gt_pts[i] + center[i]
+                    result = self.parallel_pool.apipe(self._gen_1_contact_point,
+                                                      root_to_save_file, level, shape_dir, id)
+                    allResults.append([result, level, mode, id])
 
-                        oldfile = get_pair_list(gt_pts)
-                        newfile = oldfile
-                        for i in range(len(oldfile)):
-                            for j in range(len(oldfile[0])):
-                                if i == j: continue
-                                point = oldfile[i, j, 1:]
-                                ind = find_pts_ind(gt_pts[i], point)
-                                if ind == -1:
-                                    ipdb.set_trace()
-                                else:
-                                    newfile[i, j, 1:] = cur_pts[i, ind]
-                        np.save(root_to_save_file + 'pairs_with_contact_points_%s_level' % id + str(
-                            level) + '.npy', newfile)
+        jobsCompleted = 0
+        pbar = tqdm(total=len(allResults))
+        while len(allResults) > 0:
+            for i in range(len(allResults)):
+                task, level, mode, id = allResults[i]
+                if task.ready():
+                    jobsCompleted += 1
+                    pbar.desc = "using {} cores, " \
+                                "level{}-{}-{} completed".format(self.num_core, level, mode, id)
+                    pbar.update()
+                    task.get()
+                    allResults.pop(i)
+                    break
+        self.parallel_pool.close()
+
+    @staticmethod
+    def _gen_1_contact_point(root_to_save_file, level, shape_dir, id):
+        if not os.path.exists(root_to_save_file + 'pairs_with_contact_points_%s_level' % id + str(
+                level) + '.npy'):
+            # if os.path.isfile(root + "contact_points/" + 'pairs_with_contact_points_%s_level' % id +
+            # str(level) + '.npy'):
+            cur_data_fn = os.path.join(shape_dir, '%s_level' % id + str(level) + '.npy')
+
+            cur_data = np.load(cur_data_fn, allow_pickle=True).item()
+            cur_pts = cur_data['part_pcs']  # p x N x 3 (p is unknown number of parts for this shape)
+            class_index = cur_data['part_ids']
+            num_parts, num_point, _ = cur_pts.shape
+            poses = cur_data['part_poses']
+            quat = poses[:, 3:]
+            center = poses[:, :3]
+            gt_pts = copy.copy(cur_pts)
+            for i in range(num_parts):
+                gt_pts[i] = qrot(torch.from_numpy(quat[i]).unsqueeze(0).repeat(num_point, 1).unsqueeze(0),
+                                 torch.from_numpy(cur_pts[i]).unsqueeze(0))
+                gt_pts[i] = gt_pts[i] + center[i]
+
+            oldfile = get_pair_list(gt_pts)
+            newfile = oldfile
+            for i in range(len(oldfile)):
+                for j in range(len(oldfile[0])):
+                    if i == j: continue
+                    point = oldfile[i, j, 1:]
+                    ind = find_pts_ind(gt_pts[i], point)
+                    if ind == -1:
+                        ipdb.set_trace()
+                    else:
+                        newfile[i, j, 1:] = cur_pts[i, ind]
+            np.save(root_to_save_file + 'pairs_with_contact_points_%s_level' % id + str(
+                level) + '.npy', newfile)
+            return
 
 
 if __name__ == "__main__":
@@ -285,6 +318,6 @@ if __name__ == "__main__":
     parser.add_argument('--method', default="random", help=f"choose from random and linspace'")
     args = parser.parse_args()
 
-    shape_generator = GenShapes(source_dir=args.source_dir)
-    shape_generator.pipeline(gen_info=args.gen_info,
+    shape_generator = GenShapes(source_dir=args.source_dir, num_core=3)
+    shape_generator.run_pipeline(gen_info=args.gen_info,
                              stat_path="./stats/", method=args.method)
