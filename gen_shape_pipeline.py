@@ -41,7 +41,7 @@ class GenShapes:
         backDepth = np.linspace(b2_l, b2_h, b2, endpoint=True) + (b2_l - b2_h) * 0.1 * (2 * np.random.random(l1) - 1)
         counter = 0
 
-        pbar = tqdm(desc='Generating random chairs to folder %s' % obj_save_dir,
+        pbar = tqdm(desc='        Generating random chairs to folder %s' % obj_save_dir,
                     total=len(legWidth) * len(legHeight) * len(seatWidth) * len(
                         seatDepth) * len(seatHeight) * len(backHeight) * len(backDepth) * 96)
         for i1 in legWidth:
@@ -64,7 +64,7 @@ class GenShapes:
                        s3_l=0.02, s3_h=0.1,
                        b1_l=0.2, b1_h=0.5,
                        b2_l=0.02, b2_h=0.1, ):
-        pbar = tqdm(desc='Generating random chairs to folder %s' % obj_save_dir,
+        pbar = tqdm(desc='        Generating random chairs to folder %s' % obj_save_dir,
                     total=pair_gen * 96)
         for i in tqdm(range(pair_gen)):
             legWidth = get_random(l1_l, l1_h)
@@ -200,7 +200,7 @@ class GenShapes:
                     task, level, mode, idx = allResults[i]
                     if task.ready():
                         jobsCompleted += 1
-                        pbar.desc = "using {} cores, " \
+                        pbar.desc = "        using {} cores, " \
                                     "converting level{}-mode {}-idx{}".format(self.num_core, level, mode, idx)
                         pbar.update()
                         task.get()
@@ -264,7 +264,7 @@ class GenShapes:
                 task, level, mode, id = allResults[i]
                 if task.ready():
                     jobsCompleted += 1
-                    pbar.desc = "using {} cores, " \
+                    pbar.desc = "        using {} cores, " \
                                 "level{}-{}-{} completed".format(self.num_core, level, mode, id)
                     pbar.update()
                     task.get()
