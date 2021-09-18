@@ -85,7 +85,7 @@ def get_shape_info(obj_folder_name, lev):
     fn = obj_folder_name + "/result_after_merging.json"
     root_to_load_file = []
     with open(fn, "r") as f:
-        root_to_load_file = json.load(f)[0]
+        root_to_load_file = json.load(f)
     parts_objs, parts_names = get_parts_objs(root_to_load_file, lev, '')
 
     parts_v = []

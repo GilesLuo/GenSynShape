@@ -37,7 +37,7 @@ class GenShapes:
                                     counter += 1
                                     pbar.update(96)
 
-    def pipeline(self, gen_info: dir, stat_path:str, output_dir:str):
+    def pipeline(self, gen_info: dir, stat_path: str, output_dir: str):
         """
         :param gen_info: is a dir in the format of {'cat_name': args}
                 e.g., {'Chair': (1,1,1,1,1,1,1),
@@ -54,7 +54,10 @@ class GenShapes:
             else:
                 self.gen_chair(obj_save_dir, *args)
             self.separate_data(obj_save_dir, object_name=cat_name, output_dir=self.source_dir)
-            self.prepare_dataset(obj_save_dir, self.source_dir, stat_path, cat_name)
+            root_to_save_file = self.source_dir + "shape_data/"
+            if not os.path.exists(root_to_save_file):
+                os.mkdir(root_to_save_file)
+            self.prepare_dataset(obj_save_dir, root_to_save_file, stat_path, cat_name)
 
     @staticmethod
     def separate_data(obj_dir: str, object_name, output_dir=None):
@@ -64,13 +67,12 @@ class GenShapes:
         :param object_name: {"Chair", "Table", "Lamp", ...}
         """
 
-
         if output_dir is None:
             output_dir = obj_dir + '../'
 
         if os.path.exists("{}.test.json".format(output_dir + object_name)) and \
-            os.path.exists("{}.train.json".format(output_dir + object_name)) and \
-            os.path.exists("{}.val.json".format(output_dir + object_name)):
+                os.path.exists("{}.train.json".format(output_dir + object_name)) and \
+                os.path.exists("{}.val.json".format(output_dir + object_name)):
             print("dataset json already exists in " + output_dir + ", skipping...")
             return
         print("separating data into " + obj_dir)
@@ -141,9 +143,13 @@ class GenShapes:
                 object_list = [object_json[i]['anno_id'] for i in range(len(object_json))]
                 # print(ob)
                 # for each object:
+                pbar = tqdm(total=len(object_list))
                 for i, idx in enumerate(object_list):
-                    print("level ", level, " mode ", mode, " ", idx, " is start to convert!", i, "/", len(object_list))
-
+                    if os.path.exists(root_to_save_file + str(idx) + "_level" + str(level) + ".npy"):
+                        pbar.update()
+                        pbar.desc = "level{}-mode'{}'-idx{} exists".format(level, mode, idx)
+                        continue
+                    pbar.desc = "converting level{}-mode {}-idx{}".format(level, mode, idx)
                     # get information in obj file
                     obj_folder_name = obj_dir + str(idx)
                     parts_pcs, Rs, ts, parts_names, sizes = prepare_shape.get_shape_info(obj_folder_name, lev)
@@ -159,7 +165,11 @@ class GenShapes:
                     for R, t in zip(Rs, ts):
                         if np.linalg.det(R) < 0:
                             R = -R
-                        q = Quaternion(matrix=R)
+                        try:
+                            q = Quaternion(matrix=R)
+                        except:
+                            print('broken, skipping')
+                            continue
                         q = np.array([q[i] for i in range(4)])
                         parts_pose = np.concatenate((t, q), axis=0)
                         parts_poses.append(parts_pose)
@@ -167,7 +177,8 @@ class GenShapes:
                     new_dict = {v: k for k, v in hier.items()}
                     dic_to_save = {"part_pcs"    : parts_pcs, "part_poses": parts_poses, "part_ids": parts_ids,
                                    "geo_part_ids": geo_part_ids, "sym": sym}
-                    np.save(root_to_save_file + str(fn) + "_level" + str(level) + ".npy", dic_to_save)
+                    np.save(root_to_save_file + str(idx) + "_level" + str(level) + ".npy", dic_to_save)
+                    pbar.update()
 
 
 if __name__ == "__main__":

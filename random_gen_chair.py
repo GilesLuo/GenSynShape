@@ -112,28 +112,17 @@ def generate_chair_new(out_dir, legWidth, legHeight, seatWidth, seatDepth,
     args['backDepth'] = backDepth
 
     # Make 4 variants for chair back
-    backNumSurfaceBars = np.random.randint(low=3, high=5, size=3)
-    backSurfaceBarDepth = 0.01 * np.random.random(6) + 0.01
-    back_args_set = []
-    back_args_set.append(dict({'back_type': 'simple'}))
-    back_args_set.append(dict({'hasBackTopBar'      : True, 'hasBackSideBar': True, 'back_type': 'H',
-                               'backTopBarHeight'   : args['backHeight'] / 5,
-                               'backSideBarWidth'   : args['backWidth'] / 10,
-                               'backNumSurfaceBars' : backNumSurfaceBars[0],
-                               'backSurfaceBarWidth': backSurfaceBarDepth[0],
-                               'backSurfaceBarDepth': backSurfaceBarDepth[1]}))
-    back_args_set.append(dict({'hasBackTopBar'      : False, 'hasBackSideBar': True, 'back_type': 'H',
-                               'backTopBarHeight'   : args['backHeight'] / 5,
-                               'backSideBarWidth'   : args['backWidth'] / 10,
-                               'backNumSurfaceBars' : backNumSurfaceBars[1],
-                               'backSurfaceBarWidth': backSurfaceBarDepth[2],
-                               'backSurfaceBarDepth': backSurfaceBarDepth[3]}))
-    back_args_set.append(dict({'hasBackTopBar'      : True, 'hasBackSideBar': False, 'back_type': 'T',
-                               'backTopBarHeight'   : args['backHeight'] / 10,
-                               'backSideBarWidth'   : args['backWidth'] / 10,
-                               'backNumSurfaceBars' : backNumSurfaceBars[2],
-                               'backSurfaceBarWidth': backSurfaceBarDepth[4],
-                               'backSurfaceBarDepth': backSurfaceBarDepth[5]}))
+    back_args_set = [dict({'back_type': 'simple'}),
+                     dict({'hasBackTopBar'     : True, 'hasBackSideBar': True, 'back_type': 'H',
+                           'backTopBarHeight'  : args['backHeight'] / 5, 'backSideBarWidth': args['backWidth'] / 10,
+                           'backNumSurfaceBars': 5, 'backSurfaceBarWidth': 0.01, 'backSurfaceBarDepth': 0.01}),
+                     dict({'hasBackTopBar'     : False, 'hasBackSideBar': True, 'back_type': 'H',
+                           'backTopBarHeight'  : args['backHeight'] / 5, 'backSideBarWidth': args['backWidth'] / 10,
+                           'backNumSurfaceBars': 3, 'backSurfaceBarWidth': 0.02, 'backSurfaceBarDepth': 0.02}),
+                     dict({'hasBackTopBar'     : True, 'hasBackSideBar': False, 'back_type': 'T',
+                           'backTopBarHeight'  : args['backHeight'] / 10,
+                           'backSideBarWidth'  : args['backWidth'] / 10,
+                           'backNumSurfaceBars': 4, 'backSurfaceBarWidth': 0.01, 'backSurfaceBarDepth': 0.01})]
 
     # Make 2 variants for chair legs
     leg_args_set = [dict({'mode': 0}), dict({'mode': 0.7})]
