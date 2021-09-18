@@ -1,25 +1,40 @@
 import numpy as np
 from tqdm import tqdm
-from random_gen_chair import generate_chair_new
+from random_gen_chair import generate_chair_new, generate_chair, get_random
 from pyquaternion import Quaternion
 import prepare_shape
 import os
 import json
 import random
+import os
+import json
+import copy
+import ipdb
+import torch
+import math
+import random
+from prepare_contact_points import qrot, get_pair_list, find_pts_ind
 
 
 class GenShapes:
     def __init__(self, source_dir):
         self.source_dir = source_dir
 
-    def gen_chair(self, obj_save_dir, l1=3, l2=3, s1=3, s2=3, s3=3, b1=3, b2=3):
-        legWidth = np.linspace(0.02, 0.07, l1, endpoint=True)
-        legHeight = np.linspace(0.1, 0.4, l2, endpoint=True)
-        seatWidth = np.linspace(0.4, 1.0, s1, endpoint=True)
-        seatDepth = np.linspace(0.4, 1.0, s2, endpoint=True)
-        seatHeight = np.linspace(0.02, 0.1, s3, endpoint=True)
-        backHeight = np.linspace(0.2, 0.5, b1, endpoint=True)
-        backDepth = np.linspace(0.02, 0.1, b2, endpoint=True)
+    def gen_chair_lin(self, obj_save_dir, l1, l2, s1, s2, s3, b1, b2,
+                      l1_l=0.02, l1_h=0.07,
+                      l2_l=0.1, l2_h=0.4,
+                      s1_l=0.4, s1_h=1.0,
+                      s2_l=0.4, s2_h=1.0,
+                      s3_l=0.02, s3_h=0.1,
+                      b1_l=0.2, b1_h=0.5,
+                      b2_l=0.02, b2_h=0.1):
+        legWidth = np.linspace(l1_l, l1_h, l1, endpoint=True) + (l1_h - l1_l) * 0.1 * (2 * np.random.random(l1) - 1)
+        legHeight = np.linspace(l2_l, l2_h, l2, endpoint=True) + (l2_h - l2_l) * 0.1 * (2 * np.random.random(l2) - 1)
+        seatWidth = np.linspace(s1_l, s1_h, s1, endpoint=True) + (s1_l - s1_l) * 0.1 * (2 * np.random.random(l1) - 1)
+        seatDepth = np.linspace(s2_l, s2_h, s2, endpoint=True) + (s2_l - s2_h) * 0.1 * (2 * np.random.random(l1) - 1)
+        seatHeight = np.linspace(s3_l, s3_h, s3, endpoint=True) + (s3_l - s3_h) * 0.1 * (2 * np.random.random(l1) - 1)
+        backHeight = np.linspace(b1_l, b1_h, b1, endpoint=True) + (b1_l - b1_h) * 0.1 * (2 * np.random.random(l1) - 1)
+        backDepth = np.linspace(b2_l, b2_h, b2, endpoint=True) + (b2_l - b2_h) * 0.1 * (2 * np.random.random(l1) - 1)
         counter = 0
 
         pbar = tqdm(desc='Generating random chairs to folder %s' % obj_save_dir,
@@ -37,7 +52,30 @@ class GenShapes:
                                     counter += 1
                                     pbar.update(96)
 
-    def pipeline(self, gen_info: dir, stat_path: str, output_dir: str):
+    def gen_chair_rand(self, obj_save_dir, pair_gen,
+                       l1_l=0.02, l1_h=0.07,
+                       l2_l=0.1, l2_h=0.4,
+                       s1_l=0.4, s1_h=1.0,
+                       s2_l=0.4, s2_h=1.0,
+                       s3_l=0.02, s3_h=0.1,
+                       b1_l=0.2, b1_h=0.5,
+                       b2_l=0.02, b2_h=0.1, ):
+        pbar = tqdm(desc='Generating random chairs to folder %s' % obj_save_dir,
+                    total=pair_gen * 96)
+        for i in tqdm(range(pair_gen)):
+            legWidth = get_random(l1_l, l1_h)
+            legHeight = get_random(l2_l, l2_h)
+            seatWidth = get_random(s1_l, s1_h)
+            seatDepth = get_random(s2_l, s2_h)
+            seatHeight = get_random(s3_l, s3_h)
+            backHeight = get_random(b1_l, b1_h)
+            backDepth = get_random(b2_l, b2_h)
+            generate_chair(obj_save_dir, legWidth, legHeight, seatWidth, seatDepth,
+                           seatHeight, backHeight, backDepth, i)
+            pbar.update(96)
+        pbar.close()
+
+    def pipeline(self, gen_info: dir, stat_path: str, method: str):
         """
         :param gen_info: is a dir in the format of {'cat_name': args}
                 e.g., {'Chair': (1,1,1,1,1,1,1),
@@ -45,6 +83,7 @@ class GenShapes:
                       }
         :return:
         """
+
         for cat_name, args in gen_info.items():
             obj_save_dir = self.source_dir + cat_name + '/'
             if not os.path.exists(obj_save_dir):
@@ -52,12 +91,23 @@ class GenShapes:
             if os.listdir(obj_save_dir):
                 print("chair obj data already exists in " + obj_save_dir + ", skipping...")
             else:
-                self.gen_chair(obj_save_dir, *args)
+                if method == "random":
+                    self.gen_chair_rand(obj_save_dir, np.prod(list(args)))
+                elif method == "linspace":
+                    self.gen_chair_lin(obj_save_dir, *args)
+
             self.separate_data(obj_save_dir, object_name=cat_name, output_dir=self.source_dir)
-            root_to_save_file = self.source_dir + "shape_data/"
-            if not os.path.exists(root_to_save_file):
-                os.mkdir(root_to_save_file)
-            self.prepare_dataset(obj_save_dir, root_to_save_file, stat_path, cat_name)
+            root_to_save_shape = self.source_dir + str(cat_name) + "_shape_data/"
+
+            if not os.path.exists(root_to_save_shape):
+                os.mkdir(root_to_save_shape)
+            self.prepare_dataset(obj_save_dir, root_to_save_shape, stat_path, cat_name, levels=[3])
+
+            root_to_save_contact_points = self.source_dir + str(cat_name) + "_contact_points/"
+            if not os.path.exists(root_to_save_contact_points):
+                os.mkdir(root_to_save_contact_points)
+            self.prepare_contact_points(root_to_save_shape, root_to_save_contact_points,
+                                        cat_name, levels=[3])
 
     @staticmethod
     def separate_data(obj_dir: str, object_name, output_dir=None):
@@ -73,9 +123,8 @@ class GenShapes:
         if os.path.exists("{}.test.json".format(output_dir + object_name)) and \
                 os.path.exists("{}.train.json".format(output_dir + object_name)) and \
                 os.path.exists("{}.val.json".format(output_dir + object_name)):
-            print("dataset json already exists in " + output_dir + ", skipping...")
+            print("dataset json already exists in " + output_dir + ", skipped...")
             return
-        print("separating data into " + obj_dir)
         data = []
         for folder in os.listdir(obj_dir):
             # print(folder)
@@ -90,10 +139,8 @@ class GenShapes:
                 val.append(file)
             else:
                 test.append(file)
-        print("Separation done. \n"
-              "train set size: {},\n"
-              "val   set size: {},\n "
-              "test  set size: {}".format(len(train), len(val), len(test)))
+        print("Data separated. "
+              "train set size: {}, val set size: {}, test set size: {}".format(len(train), len(val), len(test)))
 
         with open('{}.train.json'.format(output_dir + object_name), 'w') as result_file:
             json.dump(train, result_file)
@@ -122,7 +169,7 @@ class GenShapes:
             hier = f.readlines()
             hier = {'/' + s.split(' ')[1].replace('\n', ''): int(s.split(' ')[0]) for s in hier}
 
-            print(hier)
+            # print(hier)
         # for each level
         for level in levels:
 
@@ -147,7 +194,6 @@ class GenShapes:
                 for i, idx in enumerate(object_list):
                     if os.path.exists(root_to_save_file + str(idx) + "_level" + str(level) + ".npy"):
                         pbar.update()
-                        pbar.desc = "level{}-mode'{}'-idx{} exists".format(level, mode, idx)
                         continue
                     pbar.desc = "converting level{}-mode {}-idx{}".format(level, mode, idx)
                     # get information in obj file
@@ -168,7 +214,7 @@ class GenShapes:
                         try:
                             q = Quaternion(matrix=R)
                         except:
-                            print('broken, skipping')
+                            print('level{}-mode {}-idx{} broken, skipping'.format(level, mode, idx))
                             continue
                         q = np.array([q[i] for i in range(4)])
                         parts_pose = np.concatenate((t, q), axis=0)
@@ -179,6 +225,55 @@ class GenShapes:
                                    "geo_part_ids": geo_part_ids, "sym": sym}
                     np.save(root_to_save_file + str(idx) + "_level" + str(level) + ".npy", dic_to_save)
                     pbar.update()
+                pbar.close()
+
+    def prepare_contact_points(self, shape_dir, root_to_save_file, cat_name, modes=None, levels=None):
+        if levels is None:
+            levels = [3, 1, 2]
+        if modes is None:
+            modes = ["train", "val", "test"]
+        for level in levels:
+            for mode in modes:
+                object_json = json.load(open(self.source_dir + cat_name + "." + mode + ".json"))
+                object_list = [object_json[i]['anno_id'] for i in range(len(object_json))]
+                idx = 0
+                for id in object_list:
+                    idx += 1
+                    print("level", level, " ", mode, " ", id, "      ", idx, "/", len(object_list))
+                    if not os.path.exists(root_to_save_file + 'pairs_with_contact_points_%s_level' % id + str(
+                            level) + '.npy'):
+                        # if os.path.isfile(root + "contact_points/" + 'pairs_with_contact_points_%s_level' % id +
+                        # str(level) + '.npy'):
+                        cur_data_fn = os.path.join(shape_dir, '%s_level' % id + str(level) + '.npy')
+                        cur_data = np.load(cur_data_fn,
+                                           allow_pickle=True).item()
+                        cur_pts = cur_data['part_pcs']  # p x N x 3 (p is unknown number of parts for this shape)
+                        class_index = cur_data['part_ids']
+                        num_parts, num_point, _ = cur_pts.shape
+                        poses = cur_data['part_poses']
+                        quat = poses[:, 3:]
+                        center = poses[:, :3]
+                        print(cur_pts.shape)
+                        print(poses.shape)
+                        gt_pts = copy.copy(cur_pts)
+                        for i in range(num_parts):
+                            gt_pts[i] = qrot(torch.from_numpy(quat[i]).unsqueeze(0).repeat(num_point, 1).unsqueeze(0),
+                                             torch.from_numpy(cur_pts[i]).unsqueeze(0))
+                            gt_pts[i] = gt_pts[i] + center[i]
+
+                        oldfile = get_pair_list(gt_pts)
+                        newfile = oldfile
+                        for i in range(len(oldfile)):
+                            for j in range(len(oldfile[0])):
+                                if i == j: continue
+                                point = oldfile[i, j, 1:]
+                                ind = find_pts_ind(gt_pts[i], point)
+                                if ind == -1:
+                                    ipdb.set_trace()
+                                else:
+                                    newfile[i, j, 1:] = cur_pts[i, ind]
+                        np.save(root_to_save_file + 'pairs_with_contact_points_%s_level' % id + str(
+                            level) + '.npy', newfile)
 
 
 if __name__ == "__main__":
@@ -186,9 +281,10 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--source_dir', type=str, default='gensyn/')
-    parser.add_argument('--gen_info', default={"Chair": (1, 1, 1, 1, 1, 1, 2)})
+    parser.add_argument('--gen_info', default={"Chair": (1, 1, 1, 1, 1, 1, 1)})
+    parser.add_argument('--method', default="random", help=f"choose from random and linspace'")
     args = parser.parse_args()
 
     shape_generator = GenShapes(source_dir=args.source_dir)
     shape_generator.pipeline(gen_info=args.gen_info,
-                             stat_path="./stats/", output_dir=args.source_dir)
+                             stat_path="./stats/", method=args.method)

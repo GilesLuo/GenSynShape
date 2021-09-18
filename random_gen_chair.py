@@ -37,7 +37,7 @@ class Record(object):
         return s
 
 
-def generate_chair(legWidth, legHeight, seatWidth, seatDepth,
+def generate_chair(out_dir, legWidth, legHeight, seatWidth, seatDepth,
                    seatHeight, backHeight, backDepth, counter):
     args = dict()
     args['out_dir'] = out_dir
