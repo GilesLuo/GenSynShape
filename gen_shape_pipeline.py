@@ -323,7 +323,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--source_dir', type=str, default='gensyn/')
     parser.add_argument('--gen_info', default={"Chair": (1, 1, 1, 1, 1, 1, 1)})
-    parser.add_argument('--method', default="random", help=f"choose from random and linspace'")
+    parser.add_argument('--method', default="random", help="choose from random and linspace")
+    parser.add_argument('--num_core', default="32", help="number of core used for multi-processing")
     args = parser.parse_args()
 
     shape_generator = GenShapes(source_dir=args.source_dir, num_core=2)
