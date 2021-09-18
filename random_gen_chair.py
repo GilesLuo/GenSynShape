@@ -85,7 +85,7 @@ def generate_chair(out_dir, legWidth, legHeight, seatWidth, seatDepth,
             for i3 in range(4):
                 for i4 in range(3):
                     j = i1 * (2 * 4 * 3) + i2 * (4 * 3) + i3 * 3 + i4
-                    args['out_dir'] = out_dir + ('%05d' % (counter * 96 + j))
+                    args['out_dir'] = out_dir + str(counter * 96 + j)
                     cur_args = {**args, **back_args_set[i1], **leg_args_set[i2], **stretcher_args_set[i3],
                                 **arm_args_set[i4]}
                     rec = Record(cur_args)
@@ -142,7 +142,8 @@ def generate_chair_new(out_dir, legWidth, legHeight, seatWidth, seatDepth,
             for i3 in range(4):
                 for i4 in range(3):
                     j = i1 * (2 * 4 * 3) + i2 * (4 * 3) + i3 * 3 + i4
-                    args['out_dir'] = out_dir + ('%05d' % (counter * 96 + j))
+                    args['out_dir'] = out_dir + str(counter * 96 + j)
+
                     cur_args = {**args, **back_args_set[i1], **leg_args_set[i2], **stretcher_args_set[i3],
                                 **arm_args_set[i4]}
                     rec = Record(cur_args)

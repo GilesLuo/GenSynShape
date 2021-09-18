@@ -99,15 +99,16 @@ class GenShapes:
                     self.gen_chair_rand(obj_save_dir, np.prod(list(args)))
                 elif method == "linspace":
                     self.gen_chair_lin(obj_save_dir, *args)
-
+                else:
+                    raise ValueError('only support random and linspace method')
             self.separate_data(obj_save_dir, object_name=cat_name, output_dir=self.source_dir)
-            root_to_save_shape = self.source_dir + str(cat_name) + "_shape_data/"
+            root_to_save_shape = self.source_dir + "shape_data/"
 
             if not os.path.exists(root_to_save_shape):
                 os.mkdir(root_to_save_shape)
             self.prepare_data(obj_save_dir, root_to_save_shape, stat_path, cat_name, levels=[3])
 
-            root_to_save_contact_points = self.source_dir + str(cat_name) + "_contact_points/"
+            root_to_save_contact_points = self.source_dir + "contact_points/"
             if not os.path.exists(root_to_save_contact_points):
                 os.mkdir(root_to_save_contact_points)
             self.prepare_contact_points(root_to_save_shape, root_to_save_contact_points,
@@ -136,27 +137,34 @@ class GenShapes:
         random_data = random.sample(data, len(data))
 
         train, val, test = [], [], []
+        train_npy, val_npy, test_npy = [], [], []
         for file in random_data:
             if len(train) < int(len(random_data) * 7 / 10):
                 train.append(file)
+                train_npy.append(int(file["anno_id"]))
             elif len(val) < int(len(random_data) * 1 / 10):
                 val.append(file)
+                val_npy.append(int(file["anno_id"]))
             else:
                 test.append(file)
+                test_npy.append(int(file["anno_id"]))
         print("Data separated. "
               "train set size: {}, val set size: {}, test set size: {}".format(len(train), len(val), len(test)))
 
         with open('{}.train.json'.format(output_dir + object_name), 'w') as result_file:
             json.dump(train, result_file)
+        np.save('{}.train.npy'.format(output_dir + object_name), np.array(train_npy).squeeze())
 
         with open('{}.val.json'.format(output_dir + object_name), 'w') as result_file:
             json.dump(val, result_file)
+        np.save('{}.val.npy'.format(output_dir + object_name), np.array(train_npy).squeeze())
 
         with open('{}.test.json'.format(output_dir + object_name), 'w') as result_file:
             json.dump(test, result_file)
+        np.save('{}.test.npy'.format(output_dir + object_name), np.array(train_npy).squeeze())
 
     def prepare_data(self, obj_dir, root_to_save_file, stat_path,
-                        cat_name, modes=None, levels=None):
+                     cat_name, modes=None, levels=None):
         """
         :param root_to_save_file: output dir
         :param cat_name: select one from {"Cabinet", "Table", "Chair", 'Lamp'}
@@ -201,7 +209,7 @@ class GenShapes:
                     if task.ready():
                         jobsCompleted += 1
                         pbar.desc = "        using {} cores, " \
-                                    "converting level{}-mode {}-idx{}".format(self.num_core, level, mode, idx)
+                                    "generating shape pc level{}-{}-{}".format(self.num_core, level, mode, idx)
                         pbar.update()
                         task.get()
                         allResults.pop(i)
@@ -265,7 +273,7 @@ class GenShapes:
                 if task.ready():
                     jobsCompleted += 1
                     pbar.desc = "        using {} cores, " \
-                                "level{}-{}-{} completed".format(self.num_core, level, mode, id)
+                                "generating contact point level{}-{}-{}".format(self.num_core, level, mode, id)
                     pbar.update()
                     task.get()
                     allResults.pop(i)
@@ -318,6 +326,6 @@ if __name__ == "__main__":
     parser.add_argument('--method', default="random", help=f"choose from random and linspace'")
     args = parser.parse_args()
 
-    shape_generator = GenShapes(source_dir=args.source_dir, num_core=3)
+    shape_generator = GenShapes(source_dir=args.source_dir, num_core=2)
     shape_generator.run_pipeline(gen_info=args.gen_info,
-                             stat_path="./stats/", method=args.method)
+                                 stat_path="./stats/", method=args.method)
