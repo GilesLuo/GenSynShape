@@ -80,9 +80,9 @@ def get_sym_stick(sizes, gt_pcs):
     return is_sym_stick
 
 
-def get_shape_info(index, lev):
+def get_shape_info(obj_folder_name, lev):
     # get children
-    fn = "../data/partnet_dataset/" + str(index) + "/result_after_merging.json"
+    fn = obj_folder_name + "/result_after_merging.json"
     root_to_load_file = []
     with open(fn, "r") as f:
         root_to_load_file = json.load(f)[0]
@@ -91,7 +91,7 @@ def get_shape_info(index, lev):
     parts_v = []
     parts_f = []
     for part_objs in parts_objs:
-        obj_fns = ["../data/partnet_dataset/" + str(index) + "/objs/" + obj + '.obj' for obj in part_objs]
+        obj_fns = [obj_folder_name + "/objs/" + obj + '.obj' for obj in part_objs]
         vs = []
         fs = []
         for obj_fn in obj_fns:
@@ -274,68 +274,68 @@ def get_geo_part_ids(part_sizes, part_ids):
     return geo_part_ids
 
 
-if __name__ == "__main__":
-
-    root_to_load_file = "../../furniture_augmentation/gen_synshapes/gensyn/"
-    root_to_save_file = "../prepare_data_newsyn/shape_data/"
-    # root_to_save_flle = "./prepared_data"
-    # cat_name = 'Lamp'
-    # cat_name = "Cabinet"
-    # cat_name = "Table"
-    cat_name = "Chair"
-    modes = ["train", "val", "test"]
-    levels = [3, 1, 2]
-
-    # import hier imformation
-    fn_hier = root_to_load_file + "stats/after_merging_label_ids/" + cat_name + '-hier.txt'
-    with open(fn_hier) as f:
-        hier = f.readlines()
-        hier = {'/' + s.split(' ')[1].replace('\n', ''): int(s.split(' ')[0]) for s in hier}
-
-        print(hier)
-    # for each level
-    for level in levels:
-
-        # import level information
-        fn_level = root_to_load_file + "stats/after_merging_label_ids/" + cat_name + '-level-' + str(level) + ".txt"
-        lev = []
-        with open(fn_level) as f:
-            lev = f.readlines()
-            lev = ['/' + s.split(' ')[1].replace('\n', '') for s in lev]
-
-        # for each mode 
-        num = 0
-        for mode in modes:
-
-            # get the object list to deal with
-            # object_json =json.load(open(root_to_load_file + "/train_val_test_split/" + cat_name +"." + mode + ".json"))
-            object_json = json.load(open(root_to_load_file + "/" + cat_name + "." + mode + ".json"))
-            object_list = [int(object_json[i]['anno_id']) for i in range(len(object_json))]
-
-            # for each object:
-            for i, fn in enumerate(object_list):
-                print("level ", level, " mode ", mode, " ", fn, " is start to convert!", i, "/", len(object_list))
-
-                # get information in obj file
-                parts_pcs, Rs, ts, parts_names, sizes = get_shape_info(fn, lev)
-
-                # get class index and geo class index
-                parts_ids = [hier[name] for name in parts_names]
-                geo_part_ids = get_geo_part_ids(sizes, parts_ids)
-
-                # gen sym_stick info
-                sym = get_sym(parts_pcs)
-                # get part poses from R , T
-                parts_poses = []
-                for R, t in zip(Rs, ts):
-                    if np.linalg.det(R) < 0:
-                        R = -R
-                    q = Quaternion(matrix=R)
-                    q = np.array([q[i] for i in range(4)])
-                    parts_pose = np.concatenate((t, q), axis=0)
-                    parts_poses.append(parts_pose)
-                parts_poses = np.array(parts_poses)
-                new_dict = {v: k for k, v in hier.items()}
-                dic_to_save = {"part_pcs"    : parts_pcs, "part_poses": parts_poses, "part_ids": parts_ids,
-                               "geo_part_ids": geo_part_ids, "sym": sym}
-                np.save(root_to_save_file + str(fn) + "_level" + str(level) + ".npy", dic_to_save)
+# if __name__ == "__main__":
+#
+#     root_to_load_file = "../../furniture_augmentation/gen_synshapes/gensyn/"
+#     root_to_save_file = "../prepare_data_newsyn/shape_data/"
+#     # root_to_save_flle = "./prepared_data"
+#     # cat_name = 'Lamp'
+#     # cat_name = "Cabinet"
+#     # cat_name = "Table"
+#     cat_name = "Chair"
+#     modes = ["train", "val", "test"]
+#     levels = [3, 1, 2]
+#
+#     # import hier imformation
+#     fn_hier = root_to_load_file + "stats/after_merging_label_ids/" + cat_name + '-hier.txt'
+#     with open(fn_hier) as f:
+#         hier = f.readlines()
+#         hier = {'/' + s.split(' ')[1].replace('\n', ''): int(s.split(' ')[0]) for s in hier}
+#
+#         print(hier)
+#     # for each level
+#     for level in levels:
+#
+#         # import level information
+#         fn_level = root_to_load_file + "stats/after_merging_label_ids/" + cat_name + '-level-' + str(level) + ".txt"
+#         lev = []
+#         with open(fn_level) as f:
+#             lev = f.readlines()
+#             lev = ['/' + s.split(' ')[1].replace('\n', '') for s in lev]
+#
+#         # for each mode
+#         num = 0
+#         for mode in modes:
+#
+#             # get the object list to deal with
+#             # object_json =json.load(open(root_to_load_file + "/train_val_test_split/" + cat_name +"." + mode + ".json"))
+#             object_json = json.load(open(root_to_load_file + "/" + cat_name + "." + mode + ".json"))
+#             object_list = [int(object_json[i]['anno_id']) for i in range(len(object_json))]
+#
+#             # for each object:
+#             for i, fn in enumerate(object_list):
+#                 print("level ", level, " mode ", mode, " ", fn, " is start to convert!", i, "/", len(object_list))
+#
+#                 # get information in obj file
+#                 parts_pcs, Rs, ts, parts_names, sizes = get_shape_info(fn, lev)
+#
+#                 # get class index and geo class index
+#                 parts_ids = [hier[name] for name in parts_names]
+#                 geo_part_ids = get_geo_part_ids(sizes, parts_ids)
+#
+#                 # gen sym_stick info
+#                 sym = get_sym(parts_pcs)
+#                 # get part poses from R , T
+#                 parts_poses = []
+#                 for R, t in zip(Rs, ts):
+#                     if np.linalg.det(R) < 0:
+#                         R = -R
+#                     q = Quaternion(matrix=R)
+#                     q = np.array([q[i] for i in range(4)])
+#                     parts_pose = np.concatenate((t, q), axis=0)
+#                     parts_poses.append(parts_pose)
+#                 parts_poses = np.array(parts_poses)
+#                 new_dict = {v: k for k, v in hier.items()}
+#                 dic_to_save = {"part_pcs"    : parts_pcs, "part_poses": parts_poses, "part_ids": parts_ids,
+#                                "geo_part_ids": geo_part_ids, "sym": sym}
+#                 np.save(root_to_save_file + str(fn) + "_level" + str(level) + ".npy", dic_to_save)

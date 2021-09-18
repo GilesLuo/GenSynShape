@@ -13,10 +13,6 @@ class GenShapes:
         self.source_dir = source_dir
 
     def gen_chair(self, obj_save_dir, l1=3, l2=3, s1=3, s2=3, s3=3, b1=3, b2=3):
-        if not os.path.exists(obj_save_dir):
-            os.mkdir(obj_save_dir)
-        print(os.listdir(obj_save_dir))
-
         legWidth = np.linspace(0.02, 0.07, l1, endpoint=True)
         legHeight = np.linspace(0.1, 0.4, l2, endpoint=True)
         seatWidth = np.linspace(0.4, 1.0, s1, endpoint=True)
@@ -50,13 +46,15 @@ class GenShapes:
         :return:
         """
         for cat_name, args in gen_info.items():
-            obj_save_dir = self.source_dir + cat_name
+            obj_save_dir = self.source_dir + cat_name + '/'
+            if not os.path.exists(obj_save_dir):
+                os.mkdir(obj_save_dir)
             if os.listdir(obj_save_dir):
                 print("chair obj data already exists in " + obj_save_dir + ", skipping...")
             else:
                 self.gen_chair(obj_save_dir, *args)
             self.separate_data(obj_save_dir, object_name=cat_name, output_dir=self.source_dir)
-            self.prepare_dataset(self.source_dir, stat_path, cat_name)
+            self.prepare_dataset(obj_save_dir, self.source_dir, stat_path, cat_name)
 
     @staticmethod
     def separate_data(obj_dir: str, object_name, output_dir=None):
@@ -66,7 +64,7 @@ class GenShapes:
         :param object_name: {"Chair", "Table", "Lamp", ...}
         """
 
-        print("separating data into " + obj_dir)
+
         if output_dir is None:
             output_dir = obj_dir + '../'
 
@@ -75,6 +73,7 @@ class GenShapes:
             os.path.exists("{}.val.json".format(output_dir + object_name)):
             print("dataset json already exists in " + output_dir + ", skipping...")
             return
+        print("separating data into " + obj_dir)
         data = []
         for folder in os.listdir(obj_dir):
             # print(folder)
@@ -103,7 +102,7 @@ class GenShapes:
         with open('{}.test.json'.format(output_dir + object_name), 'w') as result_file:
             json.dump(test, result_file)
 
-    def prepare_dataset(self, root_to_save_file, stat_path,
+    def prepare_dataset(self, obj_dir, root_to_save_file, stat_path,
                         cat_name, modes=None, levels=None):
         """
         :param root_to_save_file: output dir
@@ -139,14 +138,15 @@ class GenShapes:
                 # get the object list to deal with
                 # object_json =json.load(open(self.source_dir + "/train_val_test_split/" + cat_name +"." + mode + ".json"))
                 object_json = json.load(open(self.source_dir + "/" + cat_name + "." + mode + ".json"))
-                object_list = [int(object_json[i]['anno_id']) for i in range(len(object_json))]
-
+                object_list = [object_json[i]['anno_id'] for i in range(len(object_json))]
+                # print(ob)
                 # for each object:
-                for i, fn in enumerate(object_list):
-                    print("level ", level, " mode ", mode, " ", fn, " is start to convert!", i, "/", len(object_list))
+                for i, idx in enumerate(object_list):
+                    print("level ", level, " mode ", mode, " ", idx, " is start to convert!", i, "/", len(object_list))
 
                     # get information in obj file
-                    parts_pcs, Rs, ts, parts_names, sizes = prepare_shape.get_shape_info(fn, lev)
+                    obj_folder_name = obj_dir + str(idx)
+                    parts_pcs, Rs, ts, parts_names, sizes = prepare_shape.get_shape_info(obj_folder_name, lev)
 
                     # get class index and geo class index
                     parts_ids = [hier[name] for name in parts_names]
