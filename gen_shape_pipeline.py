@@ -1,11 +1,9 @@
 import numpy as np
 from tqdm import tqdm
-from random_gen_chair import generate_chair_new, generate_chair, get_random
+from random_gen_chair import get_random
 from pyquaternion.quaternion import Quaternion
 import prepare_shape
-import os
-import json
-import random
+from random_gen_all import generate_furniture
 import os
 import json
 import copy
@@ -21,17 +19,19 @@ from prepare_contact_points import qrot, get_pair_list, find_pts_ind
 class GenShapes:
     def __init__(self, source_dir, num_core=16):
         self.source_dir = source_dir
+        if not os.path.exists(self.source_dir):
+            os.mkdir(self.source_dir)
         self.num_core = num_core
         self.parallel_pool = Pool(self.num_core)
 
-    def gen_chair_lin(self, obj_save_dir, l1, l2, s1, s2, s3, b1, b2,
-                      l1_l=0.02, l1_h=0.07,
-                      l2_l=0.1, l2_h=0.4,
-                      s1_l=0.4, s1_h=1.0,
-                      s2_l=0.4, s2_h=1.0,
-                      s3_l=0.02, s3_h=0.1,
-                      b1_l=0.2, b1_h=0.5,
-                      b2_l=0.02, b2_h=0.1):
+    def gen_furniture_lin(self, obj_save_dir, cat_name, l1, l2, s1, s2, s3, b1, b2,
+                          l1_l=0.02, l1_h=0.07,
+                          l2_l=0.1, l2_h=0.4,
+                          s1_l=0.4, s1_h=1.0,
+                          s2_l=0.4, s2_h=1.0,
+                          s3_l=0.02, s3_h=0.1,
+                          b1_l=0.2, b1_h=0.5,
+                          b2_l=0.02, b2_h=0.1):
         legWidth = np.linspace(l1_l, l1_h, l1, endpoint=True) + (l1_h - l1_l) * 0.1 * (2 * np.random.random(l1) - 1)
         legHeight = np.linspace(l2_l, l2_h, l2, endpoint=True) + (l2_h - l2_l) * 0.1 * (2 * np.random.random(l2) - 1)
         seatWidth = np.linspace(s1_l, s1_h, s1, endpoint=True) + (s1_l - s1_l) * 0.1 * (2 * np.random.random(l1) - 1)
@@ -41,9 +41,7 @@ class GenShapes:
         backDepth = np.linspace(b2_l, b2_h, b2, endpoint=True) + (b2_l - b2_h) * 0.1 * (2 * np.random.random(l1) - 1)
         counter = 0
 
-        pbar = tqdm(desc='        Generating random chairs to folder %s' % obj_save_dir,
-                    total=len(legWidth) * len(legHeight) * len(seatWidth) * len(
-                        seatDepth) * len(seatHeight) * len(backHeight) * len(backDepth) * 96)
+        allResults = []
         for i1 in legWidth:
             for i2 in legHeight:
                 for i3 in seatWidth:
@@ -51,22 +49,35 @@ class GenShapes:
                         for i5 in seatHeight:
                             for i6 in backHeight:
                                 for i7 in backDepth:
-                                    generate_chair_new(obj_save_dir, i1, i2, i3, i4,
-                                                       i5, i6, i7, counter)
+                                    result = self.parallel_pool.apipe(generate_furniture,
+                                                                      cat_name, obj_save_dir, i1, i2, i3, i4,
+                                                                      i5, i6, i7, counter)
+                                    allResults.append([result, counter])
                                     counter += 1
-                                    pbar.update(96)
+        jobsCompleted = 0
+        pbar = tqdm(total=len(allResults * 96))
+        while len(allResults) > 0:
+            for i in range(len(allResults)):
+                task, j = allResults[i]
+                if task.ready():
+                    jobsCompleted += 1
+                    pbar.desc = "        using {} cores, " \
+                                "generating obj".format(self.num_core, j)
+                    pbar.update(96)
+                    task.get()
+                    allResults.pop(i)
+                    break
 
-    def gen_chair_rand(self, obj_save_dir, pair_gen,
-                       l1_l=0.02, l1_h=0.07,
-                       l2_l=0.1, l2_h=0.4,
-                       s1_l=0.4, s1_h=1.0,
-                       s2_l=0.4, s2_h=1.0,
-                       s3_l=0.02, s3_h=0.1,
-                       b1_l=0.2, b1_h=0.5,
-                       b2_l=0.02, b2_h=0.1, ):
-        pbar = tqdm(desc='        Generating random chairs to folder %s' % obj_save_dir,
-                    total=pair_gen * 96)
-        for i in tqdm(range(pair_gen)):
+    def gen_furniture_rand(self, obj_save_dir, cat_name, pair_gen,
+                           l1_l=0.02, l1_h=0.07,
+                           l2_l=0.1, l2_h=0.4,
+                           s1_l=0.4, s1_h=1.0,
+                           s2_l=0.4, s2_h=1.0,
+                           s3_l=0.02, s3_h=0.1,
+                           b1_l=0.2, b1_h=0.5,
+                           b2_l=0.02, b2_h=0.1, ):
+        allResults = []
+        for i in range(pair_gen):
             legWidth = get_random(l1_l, l1_h)
             legHeight = get_random(l2_l, l2_h)
             seatWidth = get_random(s1_l, s1_h)
@@ -74,10 +85,24 @@ class GenShapes:
             seatHeight = get_random(s3_l, s3_h)
             backHeight = get_random(b1_l, b1_h)
             backDepth = get_random(b2_l, b2_h)
-            generate_chair(obj_save_dir, legWidth, legHeight, seatWidth, seatDepth,
-                           seatHeight, backHeight, backDepth, i)
-            pbar.update(96)
-        pbar.close()
+            result = self.parallel_pool.apipe(generate_furniture,
+                                              cat_name, obj_save_dir, legWidth, legHeight, seatWidth, seatDepth,
+                                              seatHeight, backHeight, backDepth, i)
+            allResults.append([result, i])
+
+        jobsCompleted = 0
+        pbar = tqdm(total=len(allResults * 96))
+        while len(allResults) > 0:
+            for i in range(len(allResults)):
+                task, j = allResults[i]
+                if task.ready():
+                    jobsCompleted += 1
+                    pbar.desc = "        using {} cores, " \
+                                "generating obj".format(self.num_core, j)
+                    pbar.update(96)
+                    task.get()
+                    allResults.pop(i)
+                    break
 
     def run_pipeline(self, gen_info: dir, stat_path: str, method: str):
         """
@@ -96,9 +121,9 @@ class GenShapes:
                 print("chair obj data already exists in " + obj_save_dir + ", skipping...")
             else:
                 if method == "random":
-                    self.gen_chair_rand(obj_save_dir, np.prod(list(args)))
+                    self.gen_furniture_rand(obj_save_dir, cat_name, np.prod(list(args)))
                 elif method == "linspace":
-                    self.gen_chair_lin(obj_save_dir, *args)
+                    self.gen_furniture_lin(obj_save_dir, cat_name, *args)
                 else:
                     raise ValueError('only support random and linspace method')
             self.separate_data(obj_save_dir, object_name=cat_name, output_dir=self.source_dir)
@@ -138,7 +163,7 @@ class GenShapes:
 
         train, val, test = [], [], []
         train_npy, val_npy, test_npy = [], [], []
-        for file in random_data:
+        for file in tqdm(random_data, desc="separating data"):
             if len(train) < int(len(random_data) * 7 / 10):
                 train.append(file)
                 train_npy.append(int(file["anno_id"]))
@@ -165,11 +190,7 @@ class GenShapes:
 
     def prepare_data(self, obj_dir, root_to_save_file, stat_path,
                      cat_name, modes=None, levels=None):
-        """
-        :param root_to_save_file: output dir
-        :param cat_name: select one from {"Cabinet", "Table", "Chair", 'Lamp'}
-        :return:
-        """
+
         if levels is None:
             levels = [3, 1, 2]
         if modes is None:
@@ -321,10 +342,10 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--source_dir', type=str, default='gensyn_chair/')
-    parser.add_argument('--gen_info', default={"Chair": (3, 3, 3, 3, 3, 3, 3)})
+    parser.add_argument('--source_dir', type=str, default='gensyn/')
+    parser.add_argument('--gen_info', default={"Chair": (1, 1, 1, 1, 1, 2, 2)})
     parser.add_argument('--method', default="linspace", help="choose from random and linspace")
-    parser.add_argument('--num_core', default="32", help="number of core used for multi-processing")
+    parser.add_argument('--num_core', default=3, help="number of core used for multi-processing")
     args = parser.parse_args()
 
     shape_generator = GenShapes(source_dir=args.source_dir, num_core=args.num_core)
