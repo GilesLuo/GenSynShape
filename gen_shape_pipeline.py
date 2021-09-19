@@ -156,23 +156,23 @@ class GenShapes:
             print("dataset json already exists in " + output_dir + ", skipped...")
             return
         data = []
-        for folder in os.listdir(obj_dir):
+        for folder_idx in os.listdir(obj_dir):
             # print(folder)
-            data.append({'anno_id': '{}'.format(folder)})
-        random_data = random.sample(data, len(data))
+            data.append(int(folder_idx))
+        random.shuffle(data)
 
         train, val, test = [], [], []
         train_npy, val_npy, test_npy = [], [], []
-        for file in tqdm(random_data, desc="separating data"):
-            if len(train) < int(len(random_data) * 7 / 10):
-                train.append(file)
-                train_npy.append(int(file["anno_id"]))
-            elif len(val) < int(len(random_data) * 1 / 10):
-                val.append(file)
-                val_npy.append(int(file["anno_id"]))
+        for file in tqdm(data, desc="separating data"):
+            if len(train) < int(len(data) * 7 / 10):
+                train.append({'anno_id': '{}'.format(file)})
+                train_npy.append(file)
+            elif len(val) < int(len(data) * 1 / 10):
+                val.append({'anno_id': '{}'.format(file)})
+                val_npy.append(file)
             else:
-                test.append(file)
-                test_npy.append(int(file["anno_id"]))
+                test.append({'anno_id': '{}'.format(file)})
+                test_npy.append(file)
         print("Data separated. "
               "train set size: {}, val set size: {}, test set size: {}".format(len(train), len(val), len(test)))
 
@@ -343,9 +343,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--source_dir', type=str, default='gensyn/')
-    parser.add_argument('--gen_info', default={"Chair": (1, 1, 1, 1, 1, 2, 2)})
+    parser.add_argument('--gen_info', default={"Chair": (3, 3, 3, 3, 3, 3, 3)})
     parser.add_argument('--method', default="linspace", help="choose from random and linspace")
-    parser.add_argument('--num_core', default=3, help="number of core used for multi-processing")
+    parser.add_argument('--num_core', default=32, help="number of core used for multi-processing")
     args = parser.parse_args()
 
     shape_generator = GenShapes(source_dir=args.source_dir, num_core=args.num_core)
