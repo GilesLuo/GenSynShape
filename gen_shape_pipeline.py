@@ -10,7 +10,6 @@ import copy
 import ipdb
 import torch
 import multiprocessing as mp
-from pathos.multiprocessing import ProcessPool as Pool
 import math
 import random
 from prepare_contact_points import qrot, get_pair_list, find_pts_ind
@@ -22,7 +21,7 @@ class GenShapes:
         if not os.path.exists(self.source_dir):
             os.mkdir(self.source_dir)
         self.num_core = num_core
-        self.parallel_pool = Pool(self.num_core)
+        self.parallel_pool = mp.Pool(self.num_core)
 
     def gen_furniture_lin(self, obj_save_dir, cat_name, l1, l2, s1, s2, s3, b1, b2,
                           l1_l=0.02, l1_h=0.07,
@@ -49,9 +48,9 @@ class GenShapes:
                         for i5 in seatHeight:
                             for i6 in backHeight:
                                 for i7 in backDepth:
-                                    result = self.parallel_pool.apipe(generate_furniture,
-                                                                      cat_name, obj_save_dir, i1, i2, i3, i4,
-                                                                      i5, i6, i7, counter)
+                                    result = self.parallel_pool.apply_async(generate_furniture,
+                                                                            args=(cat_name, obj_save_dir, i1, i2, i3, i4,
+                                                                      i5, i6, i7, counter))
                                     allResults.append([result, counter])
                                     counter += 1
         jobsCompleted = 0
@@ -85,9 +84,9 @@ class GenShapes:
             seatHeight = get_random(s3_l, s3_h)
             backHeight = get_random(b1_l, b1_h)
             backDepth = get_random(b2_l, b2_h)
-            result = self.parallel_pool.apipe(generate_furniture,
-                                              cat_name, obj_save_dir, legWidth, legHeight, seatWidth, seatDepth,
-                                              seatHeight, backHeight, backDepth, i)
+            result = self.parallel_pool.apply_async(generate_furniture,
+                                                    args=(cat_name, obj_save_dir, legWidth, legHeight, seatWidth, seatDepth,
+                                              seatHeight, backHeight, backDepth, i))
             allResults.append([result, i])
 
         jobsCompleted = 0
@@ -218,8 +217,8 @@ class GenShapes:
                 object_json = json.load(open(self.source_dir + "/" + cat_name + "." + mode + ".json"))
                 object_list = [object_json[i]['anno_id'] for i in range(len(object_json))]
                 for i, idx in enumerate(object_list):
-                    result = self.parallel_pool.apipe(self._gen_1_shape,
-                                                      root_to_save_file, idx, lev, level, obj_dir, hier)
+                    result = self.parallel_pool.apply_async(self._gen_1_shape,
+                                                            args=(root_to_save_file, idx, lev, level, obj_dir, hier))
                     allResults.append([result, level, mode, idx])
 
             jobsCompleted = 0
@@ -282,8 +281,8 @@ class GenShapes:
                 object_json = json.load(open(self.source_dir + cat_name + "." + mode + ".json"))
                 object_list = [object_json[i]['anno_id'] for i in range(len(object_json))]
                 for id in object_list:
-                    result = self.parallel_pool.apipe(self._gen_1_contact_point,
-                                                      root_to_save_file, level, shape_dir, id)
+                    result = self.parallel_pool.apply_async(self._gen_1_contact_point,
+                                                            args=(root_to_save_file, level, shape_dir, id,))
                     allResults.append([result, level, mode, id])
 
         jobsCompleted = 0
