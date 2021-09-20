@@ -7,12 +7,78 @@ from random_gen_all import generate_furniture
 import os
 import json
 import copy
-import ipdb
 import torch
 import multiprocessing as mp
 import math
 import random
 from prepare_contact_points import qrot, get_pair_list, find_pts_ind
+
+
+def _gen_1_contact_point(root_to_save_file, level, shape_dir, id):
+    if not os.path.exists(root_to_save_file + 'pairs_with_contact_points_%s_level' % id + str(
+            level) + '.npy'):
+        # if os.path.isfile(root + "contact_points/" + 'pairs_with_contact_points_%s_level' % id +
+        # str(level) + '.npy'):
+        cur_data_fn = os.path.join(shape_dir, '%s_level' % id + str(level) + '.npy')
+
+        cur_data = np.load(cur_data_fn, allow_pickle=True).item()
+        cur_pts = cur_data['part_pcs']  # p x N x 3 (p is unknown number of parts for this shape)
+        class_index = cur_data['part_ids']
+        num_parts, num_point, _ = cur_pts.shape
+        poses = cur_data['part_poses']
+        quat = poses[:, 3:]
+        center = poses[:, :3]
+        gt_pts = copy.copy(cur_pts)
+        for i in range(num_parts):
+            gt_pts[i] = qrot(torch.from_numpy(quat[i]).unsqueeze(0).repeat(num_point, 1).unsqueeze(0),
+                             torch.from_numpy(cur_pts[i]).unsqueeze(0))
+            gt_pts[i] = gt_pts[i] + center[i]
+
+        oldfile = get_pair_list(gt_pts)
+        newfile = oldfile
+        for i in range(len(oldfile)):
+            for j in range(len(oldfile[0])):
+                if i == j: continue
+                point = oldfile[i, j, 1:]
+                ind = find_pts_ind(gt_pts[i], point)
+                newfile[i, j, 1:] = cur_pts[i, ind]
+        np.save(root_to_save_file + 'pairs_with_contact_points_%s_level' % id + str(
+            level) + '.npy', newfile)
+        return
+
+
+def _gen_1_shape(root_to_save_file, idx, lev, level, obj_dir, hier):
+    if os.path.exists(root_to_save_file + str(idx) + "_level" + str(level) + ".npy"):
+        return
+
+    # get information in obj file
+    obj_folder_name = obj_dir + str(idx)
+    parts_pcs, Rs, ts, parts_names, sizes = prepare_shape.get_shape_info(obj_folder_name, lev)
+
+    # get class index and geo class index
+    parts_ids = [hier[name] for name in parts_names]
+    geo_part_ids = prepare_shape.get_geo_part_ids(sizes, parts_ids)
+
+    # gen sym_stick info
+    sym = prepare_shape.get_sym(parts_pcs)
+    # get part poses from R , T
+    parts_poses = []
+    for R, t in zip(Rs, ts):
+        if np.linalg.det(R) < 0:
+            R = -R
+
+        q = Quaternion(matrix=R)
+
+        q = np.array([q[i] for i in range(4)])
+        parts_pose = np.concatenate((t, q), axis=0)
+        parts_poses.append(parts_pose)
+
+    parts_poses = np.array(parts_poses)
+    new_dict = {v: k for k, v in hier.items()}
+    dic_to_save = {"part_pcs"    : parts_pcs, "part_poses": parts_poses, "part_ids": parts_ids,
+                   "geo_part_ids": geo_part_ids, "sym": sym}
+    np.save(root_to_save_file + str(idx) + "_level" + str(level) + ".npy", dic_to_save)
+    return
 
 
 class GenShapes:
@@ -49,8 +115,9 @@ class GenShapes:
                             for i6 in backHeight:
                                 for i7 in backDepth:
                                     result = self.parallel_pool.apply_async(generate_furniture,
-                                                                            args=(cat_name, obj_save_dir, i1, i2, i3, i4,
-                                                                      i5, i6, i7, counter))
+                                                                            args=(
+                                                                                cat_name, obj_save_dir, i1, i2, i3, i4,
+                                                                                i5, i6, i7, counter))
                                     allResults.append([result, counter])
                                     counter += 1
         jobsCompleted = 0
@@ -66,6 +133,12 @@ class GenShapes:
                     task.get()
                     allResults.pop(i)
                     break
+        self.reset_pool()
+
+    def reset_pool(self):
+        self.parallel_pool.close()
+        self.parallel_pool.join()
+        self.parallel_pool = mp.Pool(self.num_core)
 
     def gen_furniture_rand(self, obj_save_dir, cat_name, pair_gen,
                            l1_l=0.02, l1_h=0.07,
@@ -85,8 +158,10 @@ class GenShapes:
             backHeight = get_random(b1_l, b1_h)
             backDepth = get_random(b2_l, b2_h)
             result = self.parallel_pool.apply_async(generate_furniture,
-                                                    args=(cat_name, obj_save_dir, legWidth, legHeight, seatWidth, seatDepth,
-                                              seatHeight, backHeight, backDepth, i))
+                                                    args=(
+                                                        cat_name, obj_save_dir, legWidth, legHeight, seatWidth,
+                                                        seatDepth,
+                                                        seatHeight, backHeight, backDepth, i))
             allResults.append([result, i])
 
         jobsCompleted = 0
@@ -102,6 +177,7 @@ class GenShapes:
                     task.get()
                     allResults.pop(i)
                     break
+        self.reset_pool()
 
     def run_pipeline(self, gen_info: dir, stat_path: str, method: str):
         """
@@ -217,7 +293,7 @@ class GenShapes:
                 object_json = json.load(open(self.source_dir + "/" + cat_name + "." + mode + ".json"))
                 object_list = [object_json[i]['anno_id'] for i in range(len(object_json))]
                 for i, idx in enumerate(object_list):
-                    result = self.parallel_pool.apply_async(self._gen_1_shape,
+                    result = self.parallel_pool.apply_async(_gen_1_shape,
                                                             args=(root_to_save_file, idx, lev, level, obj_dir, hier))
                     allResults.append([result, level, mode, idx])
 
@@ -234,40 +310,7 @@ class GenShapes:
                         task.get()
                         allResults.pop(i)
                         break
-
-    @staticmethod
-    def _gen_1_shape(root_to_save_file, idx, lev, level, obj_dir, hier):
-        if os.path.exists(root_to_save_file + str(idx) + "_level" + str(level) + ".npy"):
-            return
-
-        # get information in obj file
-        obj_folder_name = obj_dir + str(idx)
-        parts_pcs, Rs, ts, parts_names, sizes = prepare_shape.get_shape_info(obj_folder_name, lev)
-
-        # get class index and geo class index
-        parts_ids = [hier[name] for name in parts_names]
-        geo_part_ids = prepare_shape.get_geo_part_ids(sizes, parts_ids)
-
-        # gen sym_stick info
-        sym = prepare_shape.get_sym(parts_pcs)
-        # get part poses from R , T
-        parts_poses = []
-        for R, t in zip(Rs, ts):
-            if np.linalg.det(R) < 0:
-                R = -R
-
-            q = Quaternion(matrix=R)
-
-            q = np.array([q[i] for i in range(4)])
-            parts_pose = np.concatenate((t, q), axis=0)
-            parts_poses.append(parts_pose)
-
-        parts_poses = np.array(parts_poses)
-        new_dict = {v: k for k, v in hier.items()}
-        dic_to_save = {"part_pcs"    : parts_pcs, "part_poses": parts_poses, "part_ids": parts_ids,
-                       "geo_part_ids": geo_part_ids, "sym": sym}
-        np.save(root_to_save_file + str(idx) + "_level" + str(level) + ".npy", dic_to_save)
-        return
+            self.reset_pool()
 
     def prepare_contact_points(self, shape_dir, root_to_save_file, cat_name, modes=None, levels=None):
         if levels is None:
@@ -281,7 +324,7 @@ class GenShapes:
                 object_json = json.load(open(self.source_dir + cat_name + "." + mode + ".json"))
                 object_list = [object_json[i]['anno_id'] for i in range(len(object_json))]
                 for id in object_list:
-                    result = self.parallel_pool.apply_async(self._gen_1_contact_point,
+                    result = self.parallel_pool.apply_async(_gen_1_contact_point,
                                                             args=(root_to_save_file, level, shape_dir, id,))
                     allResults.append([result, level, mode, id])
 
@@ -298,43 +341,7 @@ class GenShapes:
                     task.get()
                     allResults.pop(i)
                     break
-        self.parallel_pool.close()
-
-    @staticmethod
-    def _gen_1_contact_point(root_to_save_file, level, shape_dir, id):
-        if not os.path.exists(root_to_save_file + 'pairs_with_contact_points_%s_level' % id + str(
-                level) + '.npy'):
-            # if os.path.isfile(root + "contact_points/" + 'pairs_with_contact_points_%s_level' % id +
-            # str(level) + '.npy'):
-            cur_data_fn = os.path.join(shape_dir, '%s_level' % id + str(level) + '.npy')
-
-            cur_data = np.load(cur_data_fn, allow_pickle=True).item()
-            cur_pts = cur_data['part_pcs']  # p x N x 3 (p is unknown number of parts for this shape)
-            class_index = cur_data['part_ids']
-            num_parts, num_point, _ = cur_pts.shape
-            poses = cur_data['part_poses']
-            quat = poses[:, 3:]
-            center = poses[:, :3]
-            gt_pts = copy.copy(cur_pts)
-            for i in range(num_parts):
-                gt_pts[i] = qrot(torch.from_numpy(quat[i]).unsqueeze(0).repeat(num_point, 1).unsqueeze(0),
-                                 torch.from_numpy(cur_pts[i]).unsqueeze(0))
-                gt_pts[i] = gt_pts[i] + center[i]
-
-            oldfile = get_pair_list(gt_pts)
-            newfile = oldfile
-            for i in range(len(oldfile)):
-                for j in range(len(oldfile[0])):
-                    if i == j: continue
-                    point = oldfile[i, j, 1:]
-                    ind = find_pts_ind(gt_pts[i], point)
-                    if ind == -1:
-                        ipdb.set_trace()
-                    else:
-                        newfile[i, j, 1:] = cur_pts[i, ind]
-            np.save(root_to_save_file + 'pairs_with_contact_points_%s_level' % id + str(
-                level) + '.npy', newfile)
-            return
+        self.reset_pool()
 
 
 if __name__ == "__main__":

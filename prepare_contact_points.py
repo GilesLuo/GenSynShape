@@ -2,7 +2,6 @@ import os
 import json
 import copy
 import numpy as np
-import ipdb
 import torch
 import math
 import random
@@ -115,9 +114,6 @@ if __name__ == "__main__":
                             if i == j: continue
                             point = oldfile[i, j, 1:]
                             ind = find_pts_ind(gt_pts[i], point)
-                            if ind == -1:
-                                ipdb.set_trace()
-                            else:
-                                newfile[i, j, 1:] = cur_pts[i, ind]
+                            newfile[i, j, 1:] = cur_pts[i, ind]
                     np.save(root_to_save + "contact_points/" + 'pairs_with_contact_points_%s_level' % id + str(
                         level) + '.npy', newfile)
