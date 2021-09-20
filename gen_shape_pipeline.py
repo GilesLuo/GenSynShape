@@ -15,36 +15,36 @@ from prepare_contact_points import qrot, get_pair_list, find_pts_ind
 
 
 def _gen_1_contact_point(root_to_save_file, level, shape_dir, id):
-    if not os.path.exists(root_to_save_file + 'pairs_with_contact_points_%s_level' % id + str(
+    if os.path.exists(root_to_save_file + 'pairs_with_contact_points_%s_level' % id + str(
             level) + '.npy'):
-        # if os.path.isfile(root + "contact_points/" + 'pairs_with_contact_points_%s_level' % id +
-        # str(level) + '.npy'):
-        cur_data_fn = os.path.join(shape_dir, '%s_level' % id + str(level) + '.npy')
-
-        cur_data = np.load(cur_data_fn, allow_pickle=True).item()
-        cur_pts = cur_data['part_pcs']  # p x N x 3 (p is unknown number of parts for this shape)
-        class_index = cur_data['part_ids']
-        num_parts, num_point, _ = cur_pts.shape
-        poses = cur_data['part_poses']
-        quat = poses[:, 3:]
-        center = poses[:, :3]
-        gt_pts = copy.copy(cur_pts)
-        for i in range(num_parts):
-            gt_pts[i] = qrot(torch.from_numpy(quat[i]).unsqueeze(0).repeat(num_point, 1).unsqueeze(0),
-                             torch.from_numpy(cur_pts[i]).unsqueeze(0))
-            gt_pts[i] = gt_pts[i] + center[i]
-
-        oldfile = get_pair_list(gt_pts)
-        newfile = oldfile
-        for i in range(len(oldfile)):
-            for j in range(len(oldfile[0])):
-                if i == j: continue
-                point = oldfile[i, j, 1:]
-                ind = find_pts_ind(gt_pts[i], point)
-                newfile[i, j, 1:] = cur_pts[i, ind]
-        np.save(root_to_save_file + 'pairs_with_contact_points_%s_level' % id + str(
-            level) + '.npy', newfile)
         return
+    # if os.path.isfile(root + "contact_points/" + 'pairs_with_contact_points_%s_level' % id +
+    # str(level) + '.npy'):
+    cur_data_fn = os.path.join(shape_dir, '%s_level' % id + str(level) + '.npy')
+
+    cur_data = np.load(cur_data_fn, allow_pickle=True).item()
+    cur_pts = cur_data['part_pcs']  # p x N x 3 (p is unknown number of parts for this shape)
+    class_index = cur_data['part_ids']
+    num_parts, num_point, _ = cur_pts.shape
+    poses = cur_data['part_poses']
+    quat = poses[:, 3:]
+    center = poses[:, :3]
+    gt_pts = copy.copy(cur_pts)
+    for i in range(num_parts):
+        gt_pts[i] = qrot(torch.from_numpy(quat[i]).unsqueeze(0).repeat(num_point, 1).unsqueeze(0),
+                         torch.from_numpy(cur_pts[i]).unsqueeze(0))
+        gt_pts[i] = gt_pts[i] + center[i]
+
+    oldfile = get_pair_list(gt_pts)
+    newfile = oldfile
+    for i in range(len(oldfile)):
+        for j in range(len(oldfile[0])):
+            if i == j: continue
+            point = oldfile[i, j, 1:]
+            ind = find_pts_ind(gt_pts[i], point)
+            newfile[i, j, 1:] = cur_pts[i, ind]
+    np.save(root_to_save_file + 'pairs_with_contact_points_%s_level' % id + str(
+        level) + '.npy', newfile)
 
 
 def _gen_1_shape(root_to_save_file, idx, lev, level, obj_dir, hier):
@@ -349,9 +349,9 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--source_dir', type=str, default='gensyn/')
-    parser.add_argument('--gen_info', default={"Chair": (3, 3, 3, 3, 3, 3, 3)})
+    parser.add_argument('--gen_info', default={"Chair": (1, 1, 1, 1, 1, 1, 1)})
     parser.add_argument('--method', default="linspace", help="choose from random and linspace")
-    parser.add_argument('--num_core', default=32, help="number of core used for multi-processing")
+    parser.add_argument('--num_core', default=3, help="number of core used for multi-processing")
     args = parser.parse_args()
 
     shape_generator = GenShapes(source_dir=args.source_dir, num_core=args.num_core)
