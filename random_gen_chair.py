@@ -1,9 +1,3 @@
-import argparse
-import os
-import sys
-from progressbar import ProgressBar
-import random
-
 from chair_grammar import *
 
 from chair_back import *
