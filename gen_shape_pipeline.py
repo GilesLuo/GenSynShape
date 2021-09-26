@@ -226,7 +226,7 @@ class GenShapes:
             if not os.path.exists(obj_save_dir):
                 os.mkdir(obj_save_dir)
             if os.listdir(obj_save_dir):
-                print("chair obj data already exists in " + obj_save_dir + ", skipping...")
+                print("obj data already exists in " + obj_save_dir + ", skipping...")
             else:
                 if method == "random":
                     self.gen_furniture_rand(obj_save_dir, cat_name, np.prod(list(args)))
@@ -235,17 +235,25 @@ class GenShapes:
                 else:
                     raise ValueError('only support random and linspace method')
             self.separate_data(obj_save_dir, object_name=cat_name, output_dir=self.source_dir)
-            root_to_save_shape = self.source_dir + "shape_data/"
 
+            # gen shape pc
+            root_to_save_shape = self.source_dir + "shape_data/"
             if not os.path.exists(root_to_save_shape):
                 os.mkdir(root_to_save_shape)
-            self.prepare_data(obj_save_dir, root_to_save_shape, stat_path, cat_name, levels=[3])
+            if len(os.listdir(root_to_save_shape)) != len(os.listdir(obj_save_dir)):
+                self.prepare_data(obj_save_dir, root_to_save_shape, stat_path, cat_name, levels=[3])
+            else:
+                print(("pc data already exists in " + root_to_save_shape + ", skipping..."))
 
+            # gen contact point
             root_to_save_contact_points = self.source_dir + "contact_points/"
             if not os.path.exists(root_to_save_contact_points):
                 os.mkdir(root_to_save_contact_points)
-            self.prepare_contact_points(root_to_save_shape, root_to_save_contact_points,
-                                        cat_name, levels=[3])
+            if len(os.listdir(root_to_save_contact_points)) != len(os.listdir(obj_save_dir)):
+                self.prepare_contact_points(root_to_save_shape, root_to_save_contact_points,
+                                            cat_name, levels=[3])
+            else:
+                print(("pc data already exists in " + root_to_save_shape + ", skipping..."))
 
     @staticmethod
     def separate_data(obj_dir: str, object_name, output_dir=None):
